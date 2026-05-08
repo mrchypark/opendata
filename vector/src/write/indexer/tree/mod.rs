@@ -7,7 +7,7 @@
 use crate::DistanceMetric;
 use crate::Result;
 use crate::serde::vector_id::{LEAF_LEVEL, VectorId};
-use crate::write::delta::VectorWrite;
+use crate::write::delta::VectorDbOp;
 use crate::write::indexer::tree::centroids::{
     AllCentroidsCache, CentroidCache, TreeDepth, TreeLevel,
 };
@@ -40,6 +40,7 @@ mod vector;
 pub(crate) struct IndexerStats {
     pub(crate) inserts: usize,
     pub(crate) updates: usize,
+    pub(crate) deletes: usize,
     pub(crate) merges: HashMap<TreeLevel, usize>,
     pub(crate) splits: HashMap<TreeLevel, usize>,
     pub(crate) reassignments: HashMap<TreeLevel, usize>,
@@ -135,35 +136,38 @@ impl Indexer {
 
     pub(crate) async fn update_index(
         &mut self,
-        updates: Vec<VectorWrite>,
+        ops: Vec<VectorDbOp>,
         update_epoch: u64,
         snapshot: Arc<dyn StorageRead>,
         snapshot_epoch: u64,
     ) -> Result<IndexUpdateResults> {
+        let op_count: usize = ops.iter().map(VectorDbOp::len).sum();
         let update_span = debug_span!(
             "update_index",
             update_epoch,
             snapshot_epoch,
-            write_count = updates.len(),
+            write_count = op_count,
             depth = self.state.centroids_meta().depth as u16
         );
         let update_start = Instant::now();
         let mut stats = IndexerStats::default();
         let mut delta = VectorIndexDelta::new(&self.state);
 
-        let write = WriteVectors::new(&self.opts, &snapshot, snapshot_epoch, updates);
-        let write_start = Instant::now();
-        let (inserts, updates) = write.execute(&self.state, &mut delta).await?;
+        let batch = WriteVectors::new(&self.opts, &snapshot, snapshot_epoch, ops);
+        let batch_start = Instant::now();
+        let (inserts, updates, deletes) = batch.execute(&self.state, &mut delta).await?;
         debug!(
             parent: &update_span,
             op = "write_vectors",
-            elapsed_ms = elapsed_ms(write_start),
+            elapsed_ms = elapsed_ms(batch_start),
             inserts,
             updates,
+            deletes,
             "completed"
         );
-        stats.inserts = inserts;
-        stats.updates = updates;
+        stats.inserts += inserts;
+        stats.updates += updates;
+        stats.deletes += deletes;
 
         let depth = TreeDepth::of(self.state.centroids_meta().depth);
         let mut next_level = TreeLevel::leaf(depth);

@@ -6,7 +6,7 @@ use crate::serde::key::{CentroidSeqBlockKey, SeqBlockKey};
 use crate::serde::vector_data::Field;
 use crate::serde::vector_id::{ROOT_VECTOR_ID, VectorId};
 use crate::storage::merge_operator::VectorDbMergeOperator;
-use crate::write::delta::VectorWrite;
+use crate::write::delta::{VectorDbOp, VectorWrite};
 use crate::write::indexer::tree::centroids::AllCentroidsCacheWriter;
 use crate::write::indexer::tree::posting_list::PostingList;
 use crate::write::indexer::tree::state::{VectorIndexDelta, VectorIndexState};
@@ -303,9 +303,20 @@ impl IndexerOpTestHarness {
         }
         let snapshot = self.snapshot().await;
         let mut delta = VectorIndexDelta::new(&self.state);
-        let wv = WriteVectors::new(opts, &snapshot, SNAPSHOT_EPOCH, writes);
+        let ops = vec![VectorDbOp::Write(writes)];
+        let wv = WriteVectors::new(opts, &snapshot, SNAPSHOT_EPOCH, ops);
         wv.execute(&self.state, &mut delta).await.unwrap();
         self.apply_delta(delta).await;
+    }
+
+    pub async fn delete_and_apply(&mut self, opts: &Arc<IndexerOpts>, ids: Vec<String>) -> usize {
+        let snapshot = self.snapshot().await;
+        let mut delta = VectorIndexDelta::new(&self.state);
+        let ops = vec![VectorDbOp::Delete(ids)];
+        let wv = WriteVectors::new(opts, &snapshot, SNAPSHOT_EPOCH, ops);
+        let (_inserts, _updates, deletes) = wv.execute(&self.state, &mut delta).await.unwrap();
+        self.apply_delta(delta).await;
+        deletes
     }
 
     pub async fn validate(&self) {

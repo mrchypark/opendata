@@ -330,14 +330,14 @@ impl<D: Delta> WriteCoordinatorTask<D> {
 
     async fn handle_write(
         &mut self,
-        write: D::Write,
+        op: D::Write,
         result_tx: oneshot::Sender<handle::EpochResult<D::ApplyResult>>,
     ) -> Result<(), String> {
         let write_epoch = self.epoch;
         self.epoch += 1;
 
         let apply_start = std::time::Instant::now();
-        let result = self.delta.apply(write);
+        let result = self.delta.apply(op);
         ::metrics::histogram!(metrics::COORDINATOR_DELTA_APPLY_DURATION_SECONDS)
             .record(apply_start.elapsed().as_secs_f64());
 
