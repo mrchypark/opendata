@@ -115,6 +115,13 @@ impl SlateReadHandle {
     ) -> StorageResult<sst_blocks::CountResult> {
         sst_blocks::count_in_range(&self.source.manifest(), &self.sst_reader, range).await
     }
+
+    /// Returns the live manifest snapshot for metadata-only inspection — e.g.
+    /// summarizing how data is distributed across the LSM tree. Reads no SST
+    /// files; each call reflects the latest flushed state of the live source.
+    pub fn manifest(&self) -> VersionedManifest {
+        self.source.manifest()
+    }
 }
 
 /// SlateDB-backed implementation of the Storage trait.
