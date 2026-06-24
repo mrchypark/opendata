@@ -3,7 +3,8 @@
 use clap::Parser;
 use common::StorageConfig;
 use common::storage::config::{
-    AwsObjectStoreConfig, LocalObjectStoreConfig, ObjectStoreConfig, SlateDbStorageConfig,
+    AwsObjectStoreConfig, AzureObjectStoreConfig, GcpObjectStoreConfig, LocalObjectStoreConfig,
+    ObjectStoreConfig, SlateDbStorageConfig,
 };
 
 use crate::Config;
@@ -32,6 +33,18 @@ pub struct CliArgs {
     /// AWS region for S3 storage.
     #[arg(long, default_value = "us-east-1")]
     pub s3_region: String,
+
+    /// GCS bucket name (enables GCS storage when set).
+    #[arg(long)]
+    pub gcs_bucket: Option<String>,
+
+    /// Azure Blob Storage container name (enables Azure storage when set).
+    #[arg(long)]
+    pub azure_container: Option<String>,
+
+    /// Azure storage account name.
+    #[arg(long)]
+    pub azure_account: Option<String>,
 }
 
 impl CliArgs {
@@ -46,6 +59,33 @@ impl CliArgs {
                 object_store: ObjectStoreConfig::Aws(AwsObjectStoreConfig {
                     region: self.s3_region.clone(),
                     bucket: bucket.clone(),
+                }),
+                settings_path: None,
+                block_cache: None,
+                meta_cache: None,
+            })
+        } else if let Some(bucket) = &self.gcs_bucket {
+            StorageConfig::SlateDb(SlateDbStorageConfig {
+                path: "data".to_string(),
+                object_store: ObjectStoreConfig::Gcp(GcpObjectStoreConfig {
+                    bucket: bucket.clone(),
+                    base_url: None,
+                    skip_signature: false,
+                }),
+                settings_path: None,
+                block_cache: None,
+                meta_cache: None,
+            })
+        } else if let Some(container) = &self.azure_container {
+            StorageConfig::SlateDb(SlateDbStorageConfig {
+                path: "data".to_string(),
+                object_store: ObjectStoreConfig::Azure(AzureObjectStoreConfig {
+                    account: self.azure_account.clone(),
+                    container: container.clone(),
+                    endpoint: None,
+                    access_key: None,
+                    allow_http: false,
+                    skip_signature: false,
                 }),
                 settings_path: None,
                 block_cache: None,
@@ -103,6 +143,9 @@ mod tests {
             in_memory: true,
             s3_bucket: None,
             s3_region: "us-east-1".to_string(),
+            gcs_bucket: None,
+            azure_container: None,
+            azure_account: None,
         };
 
         // when
@@ -121,6 +164,9 @@ mod tests {
             in_memory: false,
             s3_bucket: None,
             s3_region: "us-east-1".to_string(),
+            gcs_bucket: None,
+            azure_container: None,
+            azure_account: None,
         };
 
         // when
@@ -147,6 +193,9 @@ mod tests {
             in_memory: false,
             s3_bucket: Some("my-bucket".to_string()),
             s3_region: "us-west-2".to_string(),
+            gcs_bucket: None,
+            azure_container: None,
+            azure_account: None,
         };
 
         // when
@@ -166,6 +215,65 @@ mod tests {
     }
 
     #[test]
+    fn should_create_gcs_slatedb_config() {
+        // given
+        let args = CliArgs {
+            port: 9090,
+            data_dir: ".data".to_string(),
+            in_memory: false,
+            s3_bucket: None,
+            s3_region: "us-east-1".to_string(),
+            gcs_bucket: Some("my-bucket".to_string()),
+            azure_container: None,
+            azure_account: None,
+        };
+
+        // when
+        let config = args.to_log_config();
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => match slate_config.object_store {
+                ObjectStoreConfig::Gcp(gcp_config) => {
+                    assert_eq!(gcp_config.bucket, "my-bucket");
+                }
+                _ => panic!("Expected Gcp object store"),
+            },
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_create_azure_slatedb_config() {
+        // given
+        let args = CliArgs {
+            port: 9090,
+            data_dir: ".data".to_string(),
+            in_memory: false,
+            s3_bucket: None,
+            s3_region: "us-east-1".to_string(),
+            gcs_bucket: None,
+            azure_container: Some("my-container".to_string()),
+            azure_account: Some("my-account".to_string()),
+        };
+
+        // when
+        let config = args.to_log_config();
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => match slate_config.object_store {
+                ObjectStoreConfig::Azure(azure_config) => {
+                    assert_eq!(azure_config.container, "my-container");
+                    assert_eq!(azure_config.account.as_deref(), Some("my-account"));
+                }
+                _ => panic!("Expected Azure object store"),
+            },
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
     fn should_create_server_config_from_cli_args() {
         // given
         let args = CliArgs {
@@ -174,6 +282,9 @@ mod tests {
             in_memory: true,
             s3_bucket: None,
             s3_region: "us-east-1".to_string(),
+            gcs_bucket: None,
+            azure_container: None,
+            azure_account: None,
         };
 
         // when

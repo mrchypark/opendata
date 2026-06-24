@@ -199,6 +199,12 @@ pub enum ObjectStoreConfig {
     /// AWS S3 object store.
     Aws(AwsObjectStoreConfig),
 
+    /// Google Cloud Storage object store.
+    Gcp(GcpObjectStoreConfig),
+
+    /// Azure Blob Storage object store.
+    Azure(AzureObjectStoreConfig),
+
     /// Local filesystem object store.
     Local(LocalObjectStoreConfig),
 }
@@ -211,6 +217,48 @@ pub struct AwsObjectStoreConfig {
 
     /// S3 bucket name.
     pub bucket: String,
+}
+
+/// Google Cloud Storage object store configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GcpObjectStoreConfig {
+    /// GCS bucket name.
+    pub bucket: String,
+
+    /// Optional GCS API base URL. Useful for local emulators such as fake-gcs-server.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+
+    /// Skip request signing. Useful for public buckets and local emulators.
+    #[serde(default)]
+    pub skip_signature: bool,
+}
+
+/// Azure Blob Storage object store configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AzureObjectStoreConfig {
+    /// Azure storage account name. If unset, object_store reads it from the environment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
+
+    /// Azure container name.
+    pub container: String,
+
+    /// Optional blob service endpoint. Useful for local emulators such as Azurite.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
+
+    /// Optional storage account access key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access_key: Option<String>,
+
+    /// Allow HTTP endpoints. Required for most local emulators.
+    #[serde(default)]
+    pub allow_http: bool,
+
+    /// Skip request signing. Useful for public containers.
+    #[serde(default)]
+    pub skip_signature: bool,
 }
 
 /// Local filesystem object store configuration.
@@ -314,6 +362,142 @@ settings_path: slatedb.toml
                     })
                 );
                 assert_eq!(slate_config.settings_path, Some("slatedb.toml".to_string()));
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_deserialize_slatedb_config_with_gcp_object_store() {
+        // given
+        let yaml = r#"
+type: SlateDb
+path: my-data
+object_store:
+  type: Gcp
+  bucket: my-bucket
+"#;
+
+        // when
+        let config: StorageConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "my-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Gcp(GcpObjectStoreConfig {
+                        bucket: "my-bucket".to_string(),
+                        base_url: None,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_deserialize_slatedb_config_with_azure_object_store() {
+        // given
+        let yaml = r#"
+type: SlateDb
+path: my-data
+object_store:
+  type: Azure
+  account: my-account
+  container: my-container
+"#;
+
+        // when
+        let config: StorageConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "my-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Azure(AzureObjectStoreConfig {
+                        account: Some("my-account".to_string()),
+                        container: "my-container".to_string(),
+                        endpoint: None,
+                        access_key: None,
+                        allow_http: false,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_deserialize_slatedb_config_with_gcp_emulator_options() {
+        // given
+        let yaml = r#"
+type: SlateDb
+path: my-data
+object_store:
+  type: Gcp
+  bucket: my-bucket
+  base_url: http://127.0.0.1:4443
+  skip_signature: true
+"#;
+
+        // when
+        let config: StorageConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Gcp(GcpObjectStoreConfig {
+                        bucket: "my-bucket".to_string(),
+                        base_url: Some("http://127.0.0.1:4443".to_string()),
+                        skip_signature: true,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_deserialize_slatedb_config_with_azure_emulator_options() {
+        // given
+        let yaml = r#"
+type: SlateDb
+path: my-data
+object_store:
+  type: Azure
+  account: devstoreaccount1
+  container: my-container
+  endpoint: http://127.0.0.1:10000/devstoreaccount1
+  access_key: fake-key
+  allow_http: true
+  skip_signature: true
+"#;
+
+        // when
+        let config: StorageConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Azure(AzureObjectStoreConfig {
+                        account: Some("devstoreaccount1".to_string()),
+                        container: "my-container".to_string(),
+                        endpoint: Some("http://127.0.0.1:10000/devstoreaccount1".to_string()),
+                        access_key: Some("fake-key".to_string()),
+                        allow_http: true,
+                        skip_signature: true,
+                    })
+                );
             }
             _ => panic!("Expected SlateDb config"),
         }

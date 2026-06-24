@@ -557,6 +557,74 @@ reader:
         assert!(!config.reader.skip_wal_replay);
     }
 
+    #[test]
+    fn should_parse_gcp_storage_config() {
+        // given
+        let yaml = r#"
+storage:
+  type: SlateDb
+  path: ts-data
+  object_store:
+    type: Gcp
+    bucket: ts-bucket
+"#;
+
+        // when
+        let config: PrometheusConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "ts-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    common::ObjectStoreConfig::Gcp(common::GcpObjectStoreConfig {
+                        bucket: "ts-bucket".to_string(),
+                        base_url: None,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_parse_azure_storage_config() {
+        // given
+        let yaml = r#"
+storage:
+  type: SlateDb
+  path: ts-data
+  object_store:
+    type: Azure
+    account: ts-account
+    container: ts-container
+"#;
+
+        // when
+        let config: PrometheusConfig = serde_yaml::from_str(yaml).unwrap();
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "ts-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    common::ObjectStoreConfig::Azure(common::AzureObjectStoreConfig {
+                        account: Some("ts-account".to_string()),
+                        container: "ts-container".to_string(),
+                        endpoint: None,
+                        access_key: None,
+                        allow_http: false,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
     #[cfg(feature = "otel")]
     #[test]
     fn should_parse_buffer_consumer_poll_interval() {

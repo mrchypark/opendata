@@ -325,6 +325,44 @@ pub fn create_object_store(config: &ObjectStoreConfig) -> StorageResult<Arc<dyn 
                 })?;
             Ok(Arc::new(store))
         }
+        ObjectStoreConfig::Gcp(gcp_config) => {
+            let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
+                .with_bucket_name(&gcp_config.bucket);
+            if let Some(base_url) = &gcp_config.base_url {
+                builder =
+                    builder.with_service_account_key(gcs_emulator_service_account_key(base_url));
+            }
+            if gcp_config.skip_signature {
+                builder = builder.with_skip_signature(true);
+            }
+            let store = builder
+                .build()
+                .map_err(|e| StorageError::Storage(format!("Failed to create GCS store: {}", e)))?;
+            Ok(Arc::new(store))
+        }
+        ObjectStoreConfig::Azure(azure_config) => {
+            let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
+                .with_container_name(&azure_config.container);
+            if let Some(account) = &azure_config.account {
+                builder = builder.with_account(account);
+            }
+            if let Some(endpoint) = &azure_config.endpoint {
+                builder = builder.with_endpoint(endpoint.clone());
+            }
+            if let Some(access_key) = &azure_config.access_key {
+                builder = builder.with_access_key(access_key);
+            }
+            if azure_config.allow_http {
+                builder = builder.with_allow_http(true);
+            }
+            if azure_config.skip_signature {
+                builder = builder.with_skip_signature(true);
+            }
+            let store = builder.build().map_err(|e| {
+                StorageError::Storage(format!("Failed to create Azure Blob store: {}", e))
+            })?;
+            Ok(Arc::new(store))
+        }
         ObjectStoreConfig::Local(local_config) => {
             std::fs::create_dir_all(&local_config.path).map_err(|e| {
                 StorageError::Storage(format!(
@@ -339,6 +377,17 @@ pub fn create_object_store(config: &ObjectStoreConfig) -> StorageResult<Arc<dyn 
             Ok(Arc::new(store))
         }
     }
+}
+
+fn gcs_emulator_service_account_key(base_url: &str) -> String {
+    serde_json::json!({
+        "private_key": "private_key",
+        "private_key_id": "private_key_id",
+        "client_email": "client_email",
+        "gcs_base_url": base_url,
+        "disable_oauth": true,
+    })
+    .to_string()
 }
 
 /// Creates a read-only storage instance based on configuration.

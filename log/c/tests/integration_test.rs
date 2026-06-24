@@ -394,6 +394,27 @@ fn object_store_local_lifecycle() {
 }
 
 #[test]
+fn object_store_gcp_lifecycle() {
+    let bucket = CString::new("bucket").unwrap();
+    let mut store: *mut opendata_log_object_store_t = ptr::null_mut();
+    assert_ok(unsafe { opendata_log_object_store_gcp(bucket.as_ptr(), &mut store) });
+    assert!(!store.is_null());
+    assert_ok(unsafe { opendata_log_object_store_close(store) });
+}
+
+#[test]
+fn object_store_azure_lifecycle() {
+    let account = CString::new("account").unwrap();
+    let container = CString::new("container").unwrap();
+    let mut store: *mut opendata_log_object_store_t = ptr::null_mut();
+    assert_ok(unsafe {
+        opendata_log_object_store_azure(account.as_ptr(), container.as_ptr(), &mut store)
+    });
+    assert!(!store.is_null());
+    assert_ok(unsafe { opendata_log_object_store_close(store) });
+}
+
+#[test]
 fn object_store_rejects_null_out_pointer() {
     assert_error(
         unsafe { opendata_log_object_store_in_memory(ptr::null_mut()) },

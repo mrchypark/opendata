@@ -136,6 +136,12 @@ Use the object store constructors to configure SlateDB-backed persistent storage
 opendata_log_object_store_t *store = NULL;
 opendata_log_object_store_local("/tmp/my-data", &store);
 
+// GCS
+opendata_log_object_store_gcp("my-bucket", &store);
+
+// Azure Blob Storage (pass NULL for account to read it from the environment)
+opendata_log_object_store_azure("my-account", "my-container", &store);
+
 opendata_log_config_t config = {
     .storage_type = OPENDATA_LOG_STORAGE_SLATEDB,
     .slatedb_path = "my-log",
@@ -169,5 +175,5 @@ See [`include/opendata_log.h`](include/opendata_log.h) for the full API. The fun
 | Read | `opendata_log_scan`, `_count`, `_count_with_options`, `_list_keys`, `_list_segments` |
 | Reader | `opendata_log_reader_open`, `_close`, `_scan`, `_count`, `_count_with_options`, `_list_keys`, `_list_segments` |
 | Iterators | `opendata_log_iterator_next`, `_close`, `opendata_log_key_iterator_next`, `_close` |
-| Object stores | `opendata_log_object_store_in_memory`, `_local`, `_aws`, `_close` |
+| Object stores | `opendata_log_object_store_in_memory`, `_local`, `_aws`, `_gcp`, `_azure`, `_close` |
 | Memory | `opendata_log_result_free`, `_bytes_free`, `_segments_free` |
