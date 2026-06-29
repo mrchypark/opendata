@@ -40,7 +40,7 @@ impl Default for VectorServerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::StorageConfig;
+    use common::{ObjectStoreConfig, StorageConfig};
 
     #[test]
     fn should_load_vector_config_from_yaml() {
@@ -129,5 +129,91 @@ metadata_fields: []
         // then
         assert!(matches!(config.storage, StorageConfig::InMemory));
         assert_eq!(config.dimensions, 384);
+    }
+
+    #[test]
+    fn should_load_vector_config_with_gcp_storage_from_yaml() {
+        // given
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.yaml");
+        std::fs::write(
+            &config_path,
+            r#"
+storage:
+  type: SlateDb
+  path: vector-data
+  object_store:
+    type: Gcp
+    bucket: vector-bucket
+dimensions: 384
+distance_metric: L2
+metadata_fields: []
+"#,
+        )
+        .unwrap();
+
+        // when
+        let config = load_vector_config(config_path.to_str().unwrap());
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "vector-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Gcp(common::GcpObjectStoreConfig {
+                        bucket: "vector-bucket".to_string(),
+                        base_url: None,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
+    }
+
+    #[test]
+    fn should_load_reader_config_with_azure_storage_from_yaml() {
+        // given
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("reader.yaml");
+        std::fs::write(
+            &config_path,
+            r#"
+storage:
+  type: SlateDb
+  path: vector-reader-data
+  object_store:
+    type: Azure
+    account: vector-account
+    container: vector-container
+dimensions: 384
+distance_metric: L2
+metadata_fields: []
+"#,
+        )
+        .unwrap();
+
+        // when
+        let config = load_reader_config(config_path.to_str().unwrap());
+
+        // then
+        match config.storage {
+            StorageConfig::SlateDb(slate_config) => {
+                assert_eq!(slate_config.path, "vector-reader-data");
+                assert_eq!(
+                    slate_config.object_store,
+                    ObjectStoreConfig::Azure(common::AzureObjectStoreConfig {
+                        account: Some("vector-account".to_string()),
+                        container: "vector-container".to_string(),
+                        endpoint: None,
+                        access_key: None,
+                        allow_http: false,
+                        skip_signature: false,
+                    })
+                );
+            }
+            _ => panic!("Expected SlateDb config"),
+        }
     }
 }

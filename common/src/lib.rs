@@ -11,7 +11,8 @@ pub use clock::Clock;
 pub use sequence::{DEFAULT_BLOCK_SIZE, SequenceAllocator, SequenceError, SequenceResult};
 pub use serde::seq_block::SeqBlock;
 pub use storage::config::{
-    BlockCacheConfig, FoyerHybridCacheConfig, ObjectStoreConfig, StorageConfig,
+    AwsObjectStoreConfig, AzureObjectStoreConfig, BlockCacheConfig, FoyerHybridCacheConfig,
+    GcpObjectStoreConfig, LocalObjectStoreConfig, ObjectStoreConfig, StorageConfig,
 };
 pub use storage::factory::{
     CompactorBuilder, DbBuilder, StorageBuilder, StorageReaderRuntime, StorageSemantics,

@@ -270,6 +270,13 @@ struct opendata_log_result_t opendata_log_object_store_aws(const char *region,
                                                            const char *bucket,
                                                            struct opendata_log_object_store_t **out_store);
 
+struct opendata_log_result_t opendata_log_object_store_gcp(const char *bucket,
+                                                           struct opendata_log_object_store_t **out_store);
+
+struct opendata_log_result_t opendata_log_object_store_azure(const char *account,
+                                                             const char *container,
+                                                             struct opendata_log_object_store_t **out_store);
+
 struct opendata_log_result_t opendata_log_object_store_close(struct opendata_log_object_store_t *store);
 
 struct opendata_log_result_t opendata_log_reader_open(const struct opendata_log_reader_config_t *config,

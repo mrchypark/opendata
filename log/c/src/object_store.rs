@@ -1,6 +1,9 @@
 use std::ffi::c_char;
 
-use common::storage::config::{AwsObjectStoreConfig, LocalObjectStoreConfig, ObjectStoreConfig};
+use common::storage::config::{
+    AwsObjectStoreConfig, AzureObjectStoreConfig, GcpObjectStoreConfig, LocalObjectStoreConfig,
+    ObjectStoreConfig,
+};
 
 use crate::ffi::{
     error_result, opendata_log_error_kind_t, opendata_log_object_store_t, opendata_log_result_t,
@@ -64,6 +67,66 @@ pub unsafe extern "C" fn opendata_log_object_store_aws(
         config: ObjectStoreConfig::Aws(AwsObjectStoreConfig {
             region: region_str,
             bucket: bucket_str,
+        }),
+    }));
+    success_result()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn opendata_log_object_store_gcp(
+    bucket: *const c_char,
+    out_store: *mut *mut opendata_log_object_store_t,
+) -> opendata_log_result_t {
+    if let Err(e) = require_out_ptr(out_store, "out_store") {
+        return e;
+    }
+
+    let bucket_str = match crate::ffi::cstr_to_string(bucket, "bucket") {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    *out_store = Box::into_raw(Box::new(opendata_log_object_store_t {
+        config: ObjectStoreConfig::Gcp(GcpObjectStoreConfig {
+            bucket: bucket_str,
+            base_url: None,
+            skip_signature: false,
+        }),
+    }));
+    success_result()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn opendata_log_object_store_azure(
+    account: *const c_char,
+    container: *const c_char,
+    out_store: *mut *mut opendata_log_object_store_t,
+) -> opendata_log_result_t {
+    if let Err(e) = require_out_ptr(out_store, "out_store") {
+        return e;
+    }
+
+    let account_str = if account.is_null() {
+        None
+    } else {
+        match crate::ffi::cstr_to_string(account, "account") {
+            Ok(s) => Some(s),
+            Err(e) => return e,
+        }
+    };
+    let container_str = match crate::ffi::cstr_to_string(container, "container") {
+        Ok(s) => s,
+        Err(e) => return e,
+    };
+
+    *out_store = Box::into_raw(Box::new(opendata_log_object_store_t {
+        config: ObjectStoreConfig::Azure(AzureObjectStoreConfig {
+            account: account_str,
+            container: container_str,
+            endpoint: None,
+            access_key: None,
+            allow_http: false,
+            skip_signature: false,
         }),
     }));
     success_result()
