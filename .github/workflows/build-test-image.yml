@@ -1,4 +1,5 @@
 name: Build Test Image
+run-name: Build ${{ inputs.service }} test image from ${{ inputs.ref || github.ref_name }}
 
 on:
   workflow_dispatch:
